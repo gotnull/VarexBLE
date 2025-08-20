@@ -11,11 +11,12 @@
 NimBLEServer *pServer = nullptr;
 NimBLECharacteristic *pCharacteristic = nullptr;
 
+// Press a button (active LOW pulse)
 void pressButton(int pin)
 {
-  digitalWrite(pin, LOW); // Active LOW pulse
+  digitalWrite(pin, LOW);
   delay(PULSE_DURATION);
-  digitalWrite(pin, HIGH); // Release
+  digitalWrite(pin, HIGH);
 }
 
 // BLE write callback
@@ -36,38 +37,58 @@ class MyCallbacks : public NimBLECharacteristicCallbacks
         Serial.println("Closing exhaust");
         pressButton(CLOSE_PIN);
       }
+      Serial.flush();
     }
   }
 };
 
 void setup()
 {
+  // Give Serial time to initialize
   Serial.begin(115200);
+  delay(2000);
+  Serial.println("HELLO ESP32");
+  Serial.flush();
 
   pinMode(OPEN_PIN, OUTPUT);
   pinMode(CLOSE_PIN, OUTPUT);
-  digitalWrite(OPEN_PIN, HIGH);  // Idle HIGH (open-drain)
+  digitalWrite(OPEN_PIN, HIGH);  // Idle HIGH
   digitalWrite(CLOSE_PIN, HIGH); // Idle HIGH
 
+  Serial.println("BLE Init...");
+  Serial.flush();
+
   NimBLEDevice::init("Varex-ESP32");
-  NimBLEServer *pServer = NimBLEDevice::createServer();
+
+  pServer = NimBLEDevice::createServer();
+  Serial.println("BLE Server Created...");
+  Serial.flush();
 
   NimBLEService *pService = pServer->createService(SERVICE_UUID);
   pCharacteristic = pService->createCharacteristic(
       CHARACTERISTIC_UUID,
       NIMBLE_PROPERTY::WRITE);
 
+  Serial.println("BLE Service Created...");
+  Serial.flush();
+
   pCharacteristic->setCallbacks(new MyCallbacks());
+  Serial.println("BLE Callbacks set...");
+  Serial.flush();
+
   pService->start();
+  Serial.println("BLE Service Started...");
+  Serial.flush();
 
   NimBLEAdvertising *pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
   pAdvertising->start();
 
-  Serial.println("BLE Peripheral started. Waiting for Flutter app...");
+  Serial.println("BLE Peripheral started. Waiting for Varex Controller app...");
+  Serial.flush();
 }
 
 void loop()
 {
-  // Nothing needed here, BLE events handle everything
+  // Nothing needed here; BLE events handle everything
 }
