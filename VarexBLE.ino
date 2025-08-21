@@ -17,15 +17,51 @@ unsigned long buttonStartTime = 0;
 int activePin = -1;
 bool buttonPressed = false;
 
-void startButtonPress(int pin)
+// Command queue to prevent overlapping commands
+#define QUEUE_SIZE 10
+char commandQueue[QUEUE_SIZE];
+int queueHead = 0;
+int queueTail = 0;
+bool queueFull = false;
+
+// Add command to queue
+void queueCommand(char cmd) {
+  if (!queueFull) {
+    commandQueue[queueTail] = cmd;
+    queueTail = (queueTail + 1) % QUEUE_SIZE;
+    if (queueTail == queueHead) {
+      queueFull = true;
+    }
+  }
+}
+
+// Get next command from queue
+char getNextCommand() {
+  if (queueHead == queueTail && !queueFull) {
+    return 0; // Queue empty
+  }
+  
+  char cmd = commandQueue[queueHead];
+  queueHead = (queueHead + 1) % QUEUE_SIZE;
+  queueFull = false;
+  return cmd;
+}
+
+void startButtonPress(int pin, char cmd)
 {
   if (!buttonPressed) {  // Only if no button is currently being pressed
     digitalWrite(pin, LOW);
     buttonStartTime = millis();
     activePin = pin;
     buttonPressed = true;
-    Serial.print("Button press started on pin ");
-    Serial.println(pin);
+    
+    // Print command info all at once to prevent corruption
+    if (cmd == '1') {
+      Serial.println("CMD:1 OPEN_START PIN:25");
+    } else if (cmd == '0') {
+      Serial.println("CMD:0 CLOSE_START PIN:26");
+    }
+    Serial.flush();
   }
 }
 
@@ -33,8 +69,15 @@ void updateButtonPress()
 {
   if (buttonPressed && (millis() - buttonStartTime >= PULSE_DURATION)) {
     digitalWrite(activePin, HIGH);
-    Serial.print("Button press completed on pin ");
-    Serial.println(activePin);
+    
+    // Print completion info
+    if (activePin == OPEN_PIN) {
+      Serial.println("OPEN_COMPLETE PIN:25");
+    } else if (activePin == CLOSE_PIN) {
+      Serial.println("CLOSE_COMPLETE PIN:26");
+    }
+    Serial.flush();
+    
     buttonPressed = false;
     activePin = -1;
   }
@@ -63,29 +106,10 @@ class MyCharacteristicCallbacks : public NimBLECharacteristicCallbacks
   void onWrite(NimBLECharacteristic *pChar) override
   {
     std::string val = pChar->getValue();
-    if (val.length() > 0)
+    if (val.length() > 0 && (val[0] == '1' || val[0] == '0'))
     {
-      Serial.print("Received command: ");
-      Serial.println(val[0]);
-      Serial.flush();  // Ensure serial output is sent immediately
-      
-      if (val[0] == '1')
-      {
-        Serial.println("Opening exhaust");
-        Serial.flush();
-        startButtonPress(OPEN_PIN);
-      }
-      else if (val[0] == '0')
-      {
-        Serial.println("Closing exhaust");
-        Serial.flush();
-        startButtonPress(CLOSE_PIN);
-      }
-      else
-      {
-        Serial.println("Unknown command");
-        Serial.flush();
-      }
+      // Add command to queue instead of executing immediately
+      queueCommand(val[0]);
     }
   }
 };
@@ -142,22 +166,34 @@ void loop()
   // Update non-blocking button press
   updateButtonPress();
   
+  // Process queued commands when not busy
+  if (!buttonPressed) {
+    char nextCmd = getNextCommand();
+    if (nextCmd != 0) {
+      if (nextCmd == '1') {
+        startButtonPress(OPEN_PIN, '1');
+      } else if (nextCmd == '0') {
+        startButtonPress(CLOSE_PIN, '0');
+      }
+    }
+  }
+  
   // Handle connection state changes
   if (!deviceConnected && oldDeviceConnected)
   {
     delay(500); // Give the bluetooth stack time to get things ready
     pServer->startAdvertising(); // restart advertising
-    Serial.println("Restarting advertising...");
+    Serial.println("ADVERTISING_RESTART");
     Serial.flush();
     oldDeviceConnected = deviceConnected;
   }
   
   if (deviceConnected && !oldDeviceConnected)
   {
-    Serial.println("Device connected and ready for commands");
+    Serial.println("CLIENT_CONNECTED");
     Serial.flush();
     oldDeviceConnected = deviceConnected;
   }
 
-  delay(10); // Reduced delay for more responsive button handling
+  delay(5); // Very short delay for responsive handling
 }
