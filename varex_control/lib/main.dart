@@ -47,11 +47,13 @@ class BleControlPageState extends State<BleControlPage> {
   StreamSubscription<ConnectionStateUpdate>? connectionSubscription;
   StreamSubscription<BleStatus>? bleStatusSubscription;
   String statusMessage = "Initializing...";
+  bool isConnected = false;
+  bool isScanning = false;
 
   @override
   void initState() {
     super.initState();
-    
+
     // Monitor BLE status changes
     bleStatusSubscription = flutterReactiveBle.statusStream.listen((status) {
       debugPrint("BLE Status changed to: $status");
@@ -59,11 +61,12 @@ class BleControlPageState extends State<BleControlPage> {
         scanAndConnect();
       } else if (status != BleStatus.ready) {
         setState(() {
-          statusMessage = "BLE Status: $status - Check Location permission in iOS Settings";
+          statusMessage =
+              "BLE Status: $status - Check Location permission in iOS Settings";
         });
       }
     });
-    
+
     scanAndConnect();
   }
 
@@ -76,65 +79,163 @@ class BleControlPageState extends State<BleControlPage> {
   }
 
   void scanAndConnect() async {
+    if (isScanning || isConnected) return;
+
     debugPrint("Checking BLE status...");
-    
+
     // Check BLE status first
     final status = flutterReactiveBle.status;
     debugPrint("BLE Status: $status");
-    
+
     if (status != BleStatus.ready) {
       debugPrint("BLE not ready. Current status: $status");
       setState(() {
-        statusMessage = "BLE not ready: $status. Check permissions in device settings.";
+        statusMessage =
+            "BLE not ready: $status. Check permissions in device settings.";
       });
       return;
     }
 
     setState(() {
-      statusMessage = "Scanning for Varex-ESP32...";
+      statusMessage = "Scanning for VarexESP32...";
+      isScanning = true;
     });
-    
-    debugPrint("Starting BLE scan for all devices...");
+
+    debugPrint("Starting BLE scan for devices with service UUID...");
 
     scanSubscription = flutterReactiveBle
         .scanForDevices(
-          withServices: [],
+          withServices: [serviceUuid],
           scanMode: ScanMode.lowLatency,
         )
-        .listen((DiscoveredDevice device) {
-          final name = device.name.isNotEmpty ? device.name : "Unknown";
-          debugPrint("Discovered: $name (${device.id}) RSSI: ${device.rssi}");
-          
-          if (device.name.contains("Varex-ESP32") && this.device == null) {
-            this.device = device;
-            debugPrint("Found target device! Connecting to: ${device.id}");
-            scanSubscription?.cancel();
+        .listen(
+          (DiscoveredDevice device) {
+            final name = device.name.isNotEmpty ? device.name : "Unknown";
+            debugPrint("Discovered: $name (${device.id}) RSSI: ${device.rssi}");
 
+            if (device.name.contains("VarexESP32") && this.device == null) {
+              this.device = device;
+              debugPrint("Found target device! Connecting to: ${device.id}");
+              scanSubscription?.cancel();
+
+              setState(() {
+                statusMessage = "Found VarexESP32! Connecting...";
+                isScanning = false;
+              });
+
+              connectToDevice(device);
+            }
+          },
+          onError: (error) {
+            debugPrint("Scan error: $error");
             setState(() {
-              statusMessage = "Found Varex-ESP32! Connecting...";
+              statusMessage = "Scan error: $error";
+              isScanning = false;
             });
+          },
+        );
 
-            exhaustChar = QualifiedCharacteristic(
-              serviceId: serviceUuid,
-              characteristicId: characteristicUuid,
-              deviceId: device.id,
-            );
-
-            connectionSubscription = flutterReactiveBle
-                .connectToDevice(id: device.id)
-                .listen((connectionState) {
-                  debugPrint("Connection state: ${connectionState.connectionState}");
-                }, onError: (dynamic error) {
-                  debugPrint("Connection error: $error");
-                });
-            setState(() {});
-          }
-        }, onError: (error) {
-          debugPrint("Scan error: $error");
-          setState(() {
-            statusMessage = "Scan error: $error";
-          });
+    // Stop scanning after 10 seconds if no device found
+    Timer(const Duration(seconds: 10), () {
+      if (isScanning && device == null) {
+        scanSubscription?.cancel();
+        setState(() {
+          statusMessage = "No VarexESP32 found. Tap to retry.";
+          isScanning = false;
         });
+      }
+    });
+  }
+
+  void connectToDevice(DiscoveredDevice device) {
+    connectionSubscription = flutterReactiveBle
+        .connectToDevice(id: device.id)
+        .listen(
+          (connectionState) {
+            debugPrint("Connection state: ${connectionState.connectionState}");
+
+            switch (connectionState.connectionState) {
+              case DeviceConnectionState.connecting:
+                setState(() {
+                  statusMessage = "Connecting to ${device.name}...";
+                });
+                break;
+              case DeviceConnectionState.connected:
+                debugPrint("Connected! Discovering services...");
+                setState(() {
+                  statusMessage = "Connected! Discovering services...";
+                });
+                discoverServices(device);
+                break;
+              case DeviceConnectionState.disconnecting:
+                setState(() {
+                  statusMessage = "Disconnecting...";
+                  isConnected = false;
+                });
+                break;
+              case DeviceConnectionState.disconnected:
+                setState(() {
+                  statusMessage = "Disconnected. Tap to reconnect.";
+                  isConnected = false;
+                  this.device = null;
+                  exhaustChar = null;
+                });
+                break;
+            }
+          },
+          onError: (dynamic error) {
+            debugPrint("Connection error: $error");
+            setState(() {
+              statusMessage = "Connection failed: $error";
+              isConnected = false;
+            });
+          },
+        );
+  }
+
+  void discoverServices(DiscoveredDevice device) async {
+    try {
+      await flutterReactiveBle.discoverAllServices(device.id);
+      final services = await flutterReactiveBle.getDiscoveredServices(
+        device.id,
+      );
+      debugPrint("Discovered ${services.length} services");
+
+      bool serviceFound = false;
+      for (final service in services) {
+        debugPrint("Service: ${service.id}");
+        if (service.id == serviceUuid) {
+          serviceFound = true;
+          for (final characteristic in service.characteristics) {
+            debugPrint("  Characteristic: ${characteristic.id}");
+            if (characteristic.id == characteristicUuid) {
+              exhaustChar = QualifiedCharacteristic(
+                serviceId: serviceUuid,
+                characteristicId: characteristicUuid,
+                deviceId: device.id,
+              );
+
+              setState(() {
+                statusMessage = "Ready to control exhaust";
+                isConnected = true;
+              });
+              return;
+            }
+          }
+        }
+      }
+
+      if (!serviceFound) {
+        setState(() {
+          statusMessage = "Service not found on device";
+        });
+      }
+    } catch (e) {
+      debugPrint("Service discovery error: $e");
+      setState(() {
+        statusMessage = "Service discovery failed: $e";
+      });
+    }
   }
 
   void sendCommand(String cmd) {
@@ -154,34 +255,105 @@ class BleControlPageState extends State<BleControlPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Varex BLE Control")),
+      appBar: AppBar(
+        title: const Text("Varex BLE Control"),
+        actions: [
+          if (!isConnected && !isScanning)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: scanAndConnect,
+            ),
+        ],
+      ),
       body: Center(
-        child: device == null
+        child: !isConnected
             ? Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(statusMessage, textAlign: TextAlign.center),
+                  Icon(
+                    isScanning
+                        ? Icons.bluetooth_searching
+                        : Icons.bluetooth_disabled,
+                    size: 64,
+                    color: isScanning ? Colors.blue : Colors.grey,
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    statusMessage,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 16),
+                  ),
                   const SizedBox(height: 20),
                   if (statusMessage.contains("permissions"))
                     const Text(
-                      "Go to Settings > Apps > Varex Control > Permissions\nand enable Bluetooth and Location",
+                      "Go to Settings > Privacy > Location Services\nand enable for this app",
                       textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                  if (!isScanning && !statusMessage.contains("permissions"))
+                    ElevatedButton(
+                      onPressed: scanAndConnect,
+                      child: const Text("Scan for Device"),
+                    ),
+                  if (isScanning)
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
                     ),
                 ],
               )
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text("Connected to ${device!.name}"),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () => sendCommand('1'), // Open
-                    child: const Text("Open Exhaust"),
+                  const Icon(
+                    Icons.bluetooth_connected,
+                    size: 64,
+                    color: Colors.green,
                   ),
                   const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () => sendCommand('0'), // Close
-                    child: const Text("Close Exhaust"),
+                  Text(
+                    "Connected to ${device!.name}",
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    statusMessage,
+                    style: const TextStyle(color: Colors.green),
+                  ),
+                  const SizedBox(height: 40),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => sendCommand('1'),
+                        icon: const Icon(Icons.open_in_full),
+                        label: const Text("OPEN"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () => sendCommand('0'),
+                        icon: const Icon(Icons.close_fullscreen),
+                        label: const Text("CLOSE"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
