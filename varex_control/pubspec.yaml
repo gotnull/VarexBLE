@@ -36,6 +36,16 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_reactive_ble: ^5.4.0
   permission_handler: ^11.3.1
+  
+  # Animations and visual effects
+  flutter_animate: ^4.5.0
+  shimmer: ^3.0.0
+  
+  # Haptic feedback
+  vibration: ^2.0.0
+  
+  # Icons and UI
+  phosphor_flutter: ^2.0.0
 
 dev_dependencies:
   flutter_test:

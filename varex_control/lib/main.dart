@@ -2,8 +2,13 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shimmer/shimmer.dart';
+import 'package:vibration/vibration.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 final flutterReactiveBle = FlutterReactiveBle();
 final serviceUuid = Uuid.parse("12345678-1234-1234-1234-1234567890ab");
@@ -31,7 +36,69 @@ void main() async {
     }
   }
 
-  runApp(const MaterialApp(home: BleControlPage()));
+  runApp(VarexApp());
+}
+
+class VarexApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Varex Control',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        fontFamily: 'System',
+        useMaterial3: true,
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF00D4FF),
+          secondary: Color(0xFFFF6B9D),
+          surface: Color(0xFF0A0A0A),
+          background: Color(0xFF000000),
+        ),
+      ),
+      home: const BleControlPage(),
+    );
+  }
+}
+
+// Custom gradient definitions
+class VarexGradients {
+  static const primaryGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFF00D4FF),
+      Color(0xFF0099CC),
+      Color(0xFF0066FF),
+    ],
+  );
+  
+  static const secondaryGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFFFF6B9D),
+      Color(0xFFFF4081),
+      Color(0xFFE91E63),
+    ],
+  );
+  
+  static const backgroundGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color(0xFF0A0A0A),
+      Color(0xFF000000),
+      Color(0xFF0A0A0A),
+    ],
+  );
+  
+  static const glowGradient = RadialGradient(
+    colors: [
+      Color(0x4400D4FF),
+      Color(0x2200D4FF),
+      Color(0x0000D4FF),
+    ],
+  );
 }
 
 class BleControlPage extends StatefulWidget {
@@ -301,11 +368,19 @@ class BleControlPageState extends State<BleControlPage> {
     }
   }
 
-  void sendCommand(String cmd) {
+  void sendCommand(String cmd) async {
     if (device == null || exhaustChar == null || !isConnected) {
       debugPrint("Device or characteristic not ready");
       return;
     }
+
+    // Haptic feedback
+    if (await Vibration.hasVibrator() ?? false) {
+      Vibration.vibrate(duration: 50);
+    }
+    
+    // Light haptic feedback
+    HapticFeedback.lightImpact();
 
     setState(() {
       lastCommandStatus = cmd == '1' ? "OPENING..." : "CLOSING...";
@@ -325,140 +400,529 @@ class BleControlPageState extends State<BleControlPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Varex BLE Control"),
-        actions: [
-          if (!isConnected && !isScanning && !isConnecting)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: scanAndConnect,
+      backgroundColor: Colors.black,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: VarexGradients.backgroundGradient,
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Custom App Bar
+              _buildCustomAppBar(),
+              
+              // Main Content
+              Expanded(
+                child: !isConnected ? _buildConnectionScreen() : _buildControlScreen(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomAppBar() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: VarexGradients.primaryGradient,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF00D4FF).withOpacity(0.3),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
+              ],
             ),
+            child: PhosphorIcon(
+              PhosphorIcons.lightning(),
+              color: Colors.white,
+              size: 24,
+            ),
+          ).animate().scale(delay: 100.ms, duration: 600.ms),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'VAREX',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    foreground: Paint()
+                      ..shader = VarexGradients.primaryGradient
+                          .createShader(const Rect.fromLTWH(0, 0, 200, 50)),
+                  ),
+                ).animate().slideX(delay: 200.ms, duration: 600.ms),
+                Text(
+                  'Exhaust Control System',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.7),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ).animate().slideX(delay: 300.ms, duration: 600.ms),
+              ],
+            ),
+          ),
+          if (!isConnected && !isScanning && !isConnecting)
+            _buildGlowButton(
+              onPressed: scanAndConnect,
+              icon: PhosphorIcons.magnifyingGlass(),
+              gradient: VarexGradients.primaryGradient,
+            ).animate().scale(delay: 400.ms, duration: 600.ms),
         ],
       ),
-      body: Center(
-        child: !isConnected
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+    );
+  }
+
+  Widget _buildConnectionScreen() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Animated Bluetooth Icon
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: isScanning || isConnecting 
+                  ? VarexGradients.primaryGradient
+                  : null,
+              color: isScanning || isConnecting ? null : Colors.grey.withOpacity(0.2),
+              boxShadow: isScanning || isConnecting ? [
+                BoxShadow(
+                  color: const Color(0xFF00D4FF).withOpacity(0.4),
+                  blurRadius: 40,
+                  spreadRadius: 10,
+                ),
+              ] : null,
+            ),
+            child: PhosphorIcon(
+              isScanning || isConnecting
+                  ? PhosphorIcons.bluetoothConnected()
+                  : PhosphorIcons.bluetooth(),
+              color: Colors.white,
+              size: 48,
+            ),
+          )
+          .animate(onPlay: (controller) => controller.repeat())
+          .shimmer(
+            duration: 2000.ms,
+            color: isScanning || isConnecting ? const Color(0xFF00D4FF) : Colors.transparent,
+          )
+          .scale(
+            begin: const Offset(1.0, 1.0),
+            end: const Offset(1.1, 1.1),
+            duration: 1000.ms,
+          ),
+          
+          const SizedBox(height: 40),
+          
+          // Status Message
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              statusMessage,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 18,
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ).animate().slideY(delay: 200.ms, duration: 600.ms),
+          
+          const SizedBox(height: 40),
+          
+          // Permission Instructions
+          if (statusMessage.contains("permissions"))
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 32),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Column(
                 children: [
-                  Icon(
-                    isScanning || isConnecting
-                        ? Icons.bluetooth_searching
-                        : Icons.bluetooth_disabled,
-                    size: 64,
-                    color: isScanning || isConnecting ? Colors.blue : Colors.grey,
+                  PhosphorIcon(
+                    PhosphorIcons.warning(),
+                    color: Colors.orange,
+                    size: 24,
                   ),
-                  const SizedBox(height: 20),
-                  Text(
-                    statusMessage,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 20),
-                  if (statusMessage.contains("permissions"))
-                    const Text(
-                      "Go to Settings > Privacy > Location Services\nand enable for this app",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                  if (!isScanning && !isConnecting && !statusMessage.contains("permissions"))
-                    ElevatedButton(
-                      onPressed: scanAndConnect,
-                      child: const Text("Scan for Device"),
-                    ),
-                  if (isScanning || isConnecting)
-                    const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: CircularProgressIndicator(),
-                    ),
-                ],
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.bluetooth_connected,
-                    size: 64,
-                    color: Colors.green,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    "Connected to ${device!.name}",
-                    style: const TextStyle(
-                      fontSize: 18,
+                  const SizedBox(height: 12),
+                  const Text(
+                    "Location Permission Required",
+                    style: TextStyle(
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
+                      color: Colors.orange,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    statusMessage,
-                    style: const TextStyle(color: Colors.green),
-                  ),
-                  const SizedBox(height: 10),
-                  if (lastCommandStatus.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: lastCommandStatus.contains("ERROR") 
-                            ? Colors.red.withOpacity(0.1)
-                            : lastCommandStatus.contains("COMPLETE")
-                            ? Colors.green.withOpacity(0.1)
-                            : Colors.orange.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: lastCommandStatus.contains("ERROR") 
-                              ? Colors.red
-                              : lastCommandStatus.contains("COMPLETE")
-                              ? Colors.green
-                              : Colors.orange,
-                        ),
-                      ),
-                      child: Text(
-                        lastCommandStatus,
-                        style: TextStyle(
-                          color: lastCommandStatus.contains("ERROR") 
-                              ? Colors.red
-                              : lastCommandStatus.contains("COMPLETE")
-                              ? Colors.green
-                              : Colors.orange,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Go to Settings > Privacy > Location Services\nand enable for this app",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white70,
                     ),
-                  const SizedBox(height: 30),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: () => sendCommand('1'),
-                        icon: const Icon(Icons.open_in_full),
-                        label: const Text("OPEN"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () => sendCommand('0'),
-                        icon: const Icon(Icons.close_fullscreen),
-                        label: const Text("CLOSE"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 ],
               ),
+            ).animate().slideY(delay: 400.ms, duration: 600.ms),
+          
+          const SizedBox(height: 40),
+          
+          // Scan Button or Progress
+          if (!isScanning && !isConnecting && !statusMessage.contains("permissions"))
+            _buildGlowButton(
+              onPressed: scanAndConnect,
+              icon: PhosphorIcons.magnifyingGlass(),
+              gradient: VarexGradients.primaryGradient,
+              text: "SCAN FOR DEVICE",
+              isLarge: true,
+            ).animate().slideY(delay: 600.ms, duration: 600.ms),
+          
+          if (isScanning || isConnecting)
+            Column(
+              children: [
+                SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 4,
+                    valueColor: AlwaysStoppedAnimation(
+                      Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (isScanning)
+                  Shimmer.fromColors(
+                    baseColor: Colors.white.withOpacity(0.5),
+                    highlightColor: const Color(0xFF00D4FF),
+                    child: const Text(
+                      'SCANNING...',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ),
+                if (isConnecting)
+                  Shimmer.fromColors(
+                    baseColor: Colors.white.withOpacity(0.5),
+                    highlightColor: const Color(0xFF00D4FF),
+                    child: const Text(
+                      'CONNECTING...',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ),
+              ],
+            ).animate().fadeIn(delay: 300.ms),
+        ],
       ),
     );
+  }
+
+  Widget _buildControlScreen() {
+    return Column(
+      children: [
+        // Connection Status Header
+        Container(
+          margin: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: VarexGradients.glowGradient,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: const Color(0xFF00D4FF).withOpacity(0.3),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF00D4FF).withOpacity(0.2),
+                blurRadius: 30,
+                spreadRadius: 5,
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // Connected Icon
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: VarexGradients.primaryGradient,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00D4FF).withOpacity(0.5),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: PhosphorIcon(
+                  PhosphorIcons.checkCircle(),
+                  color: Colors.white,
+                  size: 32,
+                ),
+              )
+              .animate(onPlay: (controller) => controller.repeat())
+              .shimmer(duration: 3000.ms, color: Colors.white.withOpacity(0.3)),
+              
+              const SizedBox(height: 16),
+              
+              Text(
+                "CONNECTED",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  foreground: Paint()
+                    ..shader = VarexGradients.primaryGradient
+                        .createShader(const Rect.fromLTWH(0, 0, 200, 50)),
+                  letterSpacing: 2,
+                ),
+              ),
+              
+              const SizedBox(height: 8),
+              
+              Text(
+                device!.name,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              ),
+              
+              const SizedBox(height: 8),
+              
+              Text(
+                statusMessage,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withOpacity(0.8),
+                ),
+              ),
+            ],
+          ),
+        ).animate().slideY(delay: 100.ms, duration: 600.ms),
+        
+        // Command Status
+        if (lastCommandStatus.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: _getStatusColor().withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _getStatusColor().withOpacity(0.5),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _getStatusColor().withOpacity(0.3),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                PhosphorIcon(
+                  _getStatusIcon(),
+                  color: _getStatusColor(),
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  lastCommandStatus,
+                  style: TextStyle(
+                    color: _getStatusColor(),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ).animate().slideX(delay: 200.ms, duration: 400.ms),
+        
+        const Spacer(),
+        
+        // Control Buttons
+        Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Text(
+                'EXHAUST CONTROL',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white.withOpacity(0.8),
+                  letterSpacing: 2,
+                ),
+              ).animate().slideY(delay: 300.ms, duration: 600.ms),
+              
+              const SizedBox(height: 40),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildControlButton(
+                      onPressed: () => sendCommand('1'),
+                      icon: PhosphorIcons.arrowsOut(),
+                      text: 'OPEN',
+                      gradient: VarexGradients.primaryGradient,
+                      delay: 400,
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: _buildControlButton(
+                      onPressed: () => sendCommand('0'),
+                      icon: PhosphorIcons.arrowsIn(),
+                      text: 'CLOSE',
+                      gradient: VarexGradients.secondaryGradient,
+                      delay: 500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+
+  Widget _buildGlowButton({
+    required VoidCallback onPressed,
+    required PhosphorIconData icon,
+    required Gradient gradient,
+    String? text,
+    bool isLarge = false,
+    int delay = 0,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: EdgeInsets.all(isLarge ? 20 : 12),
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(isLarge ? 20 : 16),
+          boxShadow: [
+            BoxShadow(
+              color: gradient.colors.first.withOpacity(0.4),
+              blurRadius: 20,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PhosphorIcon(icon, color: Colors.white, size: isLarge ? 24 : 20),
+            if (text != null) ...[
+              const SizedBox(width: 12),
+              Text(
+                text,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: isLarge ? 16 : 14,
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildControlButton({
+    required VoidCallback onPressed,
+    required PhosphorIconData icon,
+    required String text,
+    required Gradient gradient,
+    required int delay,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        height: 80,
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: gradient.colors.first.withOpacity(0.4),
+              blurRadius: 25,
+              spreadRadius: 3,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            PhosphorIcon(icon, color: Colors.white, size: 32),
+            const SizedBox(height: 8),
+            Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                letterSpacing: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).animate().scale(delay: delay.ms, duration: 600.ms);
+  }
+
+  Color _getStatusColor() {
+    if (lastCommandStatus.contains("ERROR")) return Colors.red;
+    if (lastCommandStatus.contains("COMPLETE")) return const Color(0xFF00D4FF);
+    return Colors.orange;
+  }
+
+  PhosphorIconData _getStatusIcon() {
+    if (lastCommandStatus.contains("ERROR")) return PhosphorIcons.xCircle();
+    if (lastCommandStatus.contains("COMPLETE")) return PhosphorIcons.checkCircle();
+    return PhosphorIcons.clock();
   }
 }
