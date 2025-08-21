@@ -53,9 +53,10 @@ class VarexApp extends StatelessWidget {
         fontFamily: 'System',
         useMaterial3: true,
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF00D4FF),
-          secondary: Color(0xFFFF6B9D),
-          surface: Color(0xFF0A0A0A),
+          primary: VarexColors.primary,
+          secondary: VarexColors.secondary,
+          surface: VarexColors.cardBackground,
+          background: VarexColors.background,
         ),
       ),
       home: const BleControlPage(),
@@ -63,29 +64,16 @@ class VarexApp extends StatelessWidget {
   }
 }
 
-// Custom gradient definitions
-class VarexGradients {
-  static const primaryGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFF00D4FF), Color(0xFF0099CC), Color(0xFF0066FF)],
-  );
-
-  static const secondaryGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFFFF6B9D), Color(0xFFFF4081), Color(0xFFE91E63)],
-  );
-
-  static const backgroundGradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [Color(0xFF0A0A0A), Color(0xFF000000), Color(0xFF0A0A0A)],
-  );
-
-  static const glowGradient = RadialGradient(
-    colors: [Color(0x4400D4FF), Color(0x2200D4FF), Color(0x0000D4FF)],
-  );
+// Clean color palette like Flighty
+class VarexColors {
+  static const background = Color(0xFF000000);
+  static const cardBackground = Color(0xFF1C1C1E);
+  static const primary = Color(0xFF007AFF);
+  static const secondary = Color(0xFF34C759);
+  static const destructive = Color(0xFFFF3B30);
+  static const textPrimary = Color(0xFFFFFFFF);
+  static const textSecondary = Color(0xFF8E8E93);
+  static const separator = Color(0xFF38383A);
 }
 
 class BleControlPage extends StatefulWidget {
@@ -393,544 +381,441 @@ class BleControlPageState extends State<BleControlPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: VarexGradients.backgroundGradient,
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Custom App Bar
-              _buildCustomAppBar(),
-
-              // Main Content
-              Expanded(
-                child: !isConnected
-                    ? _buildConnectionScreen()
-                    : _buildControlScreen(),
-              ),
-            ],
-          ),
+      backgroundColor: VarexColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildAppBar(),
+            Expanded(
+              child: !isConnected
+                  ? _buildConnectionScreen()
+                  : _buildControlScreen(),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildCustomAppBar() {
+  Widget _buildAppBar() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              gradient: VarexGradients.primaryGradient,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0x4D00D4FF),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                ),
-              ],
+              color: VarexColors.cardBackground,
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: PhosphorIcon(
-              PhosphorIcons.lightning(),
-              color: Colors.white,
-              size: 24,
+            child: Icon(
+              Icons.settings_input_antenna,
+              color: VarexColors.primary,
+              size: 20,
             ),
-          ).animate().scale(delay: 100.ms, duration: 600.ms),
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'VAREX',
+                  'Varex Control',
                   style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    foreground: Paint()
-                      ..shader = VarexGradients.primaryGradient.createShader(
-                        const Rect.fromLTWH(0, 0, 200, 50),
-                      ),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: VarexColors.textPrimary,
                   ),
-                ).animate().slideX(delay: 200.ms, duration: 600.ms),
+                ),
                 Text(
-                  'Exhaust Control System',
+                  'Exhaust System',
                   style: TextStyle(
                     fontSize: 14,
-                    color: const Color(0xB3FFFFFF),
-                    fontWeight: FontWeight.w500,
+                    color: VarexColors.textSecondary,
+                    fontWeight: FontWeight.w400,
                   ),
-                ).animate().slideX(delay: 300.ms, duration: 600.ms),
+                ),
               ],
             ),
           ),
           if (!isConnected && !isScanning && !isConnecting)
-            _buildGlowButton(
-              onPressed: scanAndConnect,
-              icon: PhosphorIcons.magnifyingGlass(),
-              gradient: VarexGradients.primaryGradient,
-            ).animate().scale(delay: 400.ms, duration: 600.ms),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: VarexColors.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: IconButton(
+                onPressed: scanAndConnect,
+                icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
+                padding: EdgeInsets.zero,
+              ),
+            ),
         ],
       ),
     );
   }
 
   Widget _buildConnectionScreen() {
-    return Center(
+    return Padding(
+      padding: const EdgeInsets.all(20),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Animated Bluetooth Icon
-          Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: isScanning || isConnecting
-                      ? VarexGradients.primaryGradient
-                      : null,
-                  color: isScanning || isConnecting
-                      ? null
-                      : Colors.grey.withValues(alpha: 0.2),
-                  boxShadow: isScanning || isConnecting
-                      ? [
-                          BoxShadow(
-                            color: const Color(
-                              0xFF00D4FF,
-                            ).withValues(alpha: 0.4),
-                            blurRadius: 40,
-                            spreadRadius: 10,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: PhosphorIcon(
-                  isScanning || isConnecting
-                      ? PhosphorIcons.bluetoothConnected()
-                      : PhosphorIcons.bluetooth(),
-                  color: Colors.white,
-                  size: 48,
-                ),
-              )
-              .animate(onPlay: (controller) => controller.repeat())
-              .shimmer(
-                duration: 2000.ms,
-                color: isScanning || isConnecting
-                    ? const Color(0xFF00D4FF)
-                    : Colors.transparent,
-              )
-              .scale(
-                begin: const Offset(1.0, 1.0),
-                end: const Offset(1.1, 1.1),
-                duration: 1000.ms,
-              ),
-
           const SizedBox(height: 40),
-
-          // Status Message
+          
+          // Status Card
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.2),
-                width: 1,
-              ),
+              color: VarexColors.cardBackground,
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: Text(
-              statusMessage,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 18,
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Column(
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: isScanning || isConnecting 
+                        ? VarexColors.primary 
+                        : VarexColors.separator,
+                    borderRadius: BorderRadius.circular(32),
+                  ),
+                  child: Icon(
+                    isScanning || isConnecting 
+                        ? Icons.bluetooth_searching 
+                        : Icons.bluetooth_disabled,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  statusMessage,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: VarexColors.textPrimary,
+                  ),
+                ),
+              ],
             ),
-          ).animate().slideY(delay: 200.ms, duration: 600.ms),
+          ),
 
-          const SizedBox(height: 40),
+          const SizedBox(height: 20),
 
-          // Permission Instructions
+          // Permission Warning
           if (statusMessage.contains("permissions"))
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 32),
-              padding: const EdgeInsets.all(20),
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                color: VarexColors.destructive.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: VarexColors.destructive.withValues(alpha: 0.3),
+                ),
               ),
-              child: Column(
+              child: Row(
                 children: [
-                  PhosphorIcon(
-                    PhosphorIcons.warning(),
-                    color: Colors.orange,
-                    size: 24,
+                  Icon(
+                    Icons.warning_rounded,
+                    color: VarexColors.destructive,
+                    size: 20,
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    "Location Permission Required",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Location Permission Required',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: VarexColors.destructive,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Enable in Settings > Privacy',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: VarexColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "Go to Settings > Privacy > Location Services\nand enable for this app",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.white70),
                   ),
                 ],
               ),
-            ).animate().slideY(delay: 400.ms, duration: 600.ms),
+            ),
 
-          const SizedBox(height: 40),
+          const Spacer(),
 
-          // Scan Button or Progress
-          if (!isScanning &&
-              !isConnecting &&
-              !statusMessage.contains("permissions"))
-            _buildGlowButton(
-              onPressed: scanAndConnect,
-              icon: PhosphorIcons.magnifyingGlass(),
-              gradient: VarexGradients.primaryGradient,
-              text: "SCAN FOR DEVICE",
-              isLarge: true,
-            ).animate().slideY(delay: 600.ms, duration: 600.ms),
+          // Action Button
+          if (!isScanning && !isConnecting && !statusMessage.contains("permissions"))
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: scanAndConnect,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: VarexColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'Scan for Device',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
 
+          // Loading State
           if (isScanning || isConnecting)
             Column(
               children: [
                 SizedBox(
-                  width: 60,
-                  height: 60,
+                  width: 40,
+                  height: 40,
                   child: CircularProgressIndicator(
-                    strokeWidth: 4,
-                    valueColor: AlwaysStoppedAnimation(
-                      Theme.of(context).colorScheme.primary,
-                    ),
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation(VarexColors.primary),
                   ),
                 ),
-                const SizedBox(height: 20),
-                if (isScanning)
-                  Shimmer.fromColors(
-                    baseColor: Colors.white.withValues(alpha: 0.5),
-                    highlightColor: const Color(0xFF00D4FF),
-                    child: const Text(
-                      'SCANNING...',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
-                      ),
-                    ),
+                const SizedBox(height: 16),
+                Text(
+                  isScanning ? 'Scanning...' : 'Connecting...',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: VarexColors.textSecondary,
+                    fontWeight: FontWeight.w500,
                   ),
-                if (isConnecting)
-                  Shimmer.fromColors(
-                    baseColor: Colors.white.withValues(alpha: 0.5),
-                    highlightColor: const Color(0xFF00D4FF),
-                    child: const Text(
-                      'CONNECTING...',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                  ),
+                ),
               ],
-            ).animate().fadeIn(delay: 300.ms),
+            ),
+
+          const SizedBox(height: 40),
         ],
       ),
     );
   }
 
   Widget _buildControlScreen() {
-    return Column(
-      children: [
-        // Connection Status Header
-        Container(
-          margin: const EdgeInsets.all(20),
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: VarexGradients.glowGradient,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: const Color(0xFF00D4FF).withValues(alpha: 0.3),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF00D4FF).withValues(alpha: 0.2),
-                blurRadius: 30,
-                spreadRadius: 5,
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              // Connected Icon
-              Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: VarexGradients.primaryGradient,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF00D4FF).withValues(alpha: 0.5),
-                          blurRadius: 20,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: PhosphorIcon(
-                      PhosphorIcons.checkCircle(),
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                  )
-                  .animate(onPlay: (controller) => controller.repeat())
-                  .shimmer(
-                    duration: 3000.ms,
-                    color: Colors.white.withValues(alpha: 0.3),
-                  ),
-
-              const SizedBox(height: 16),
-
-              Text(
-                "CONNECTED",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  foreground: Paint()
-                    ..shader = VarexGradients.primaryGradient.createShader(
-                      const Rect.fromLTWH(0, 0, 200, 50),
-                    ),
-                  letterSpacing: 2,
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              Text(
-                device!.name,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              Text(
-                statusMessage,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withValues(alpha: 0.8),
-                ),
-              ),
-            ],
-          ),
-        ).animate().slideY(delay: 100.ms, duration: 600.ms),
-
-        // Command Status
-        if (lastCommandStatus.isNotEmpty)
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          // Connection Status Card
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: _getStatusColor().withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: _getStatusColor().withValues(alpha: 0.5),
-                width: 2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: _getStatusColor().withValues(alpha: 0.3),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                ),
-              ],
+              color: VarexColors.cardBackground,
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                PhosphorIcon(
-                  _getStatusIcon(),
-                  color: _getStatusColor(),
-                  size: 20,
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: VarexColors.secondary,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  lastCommandStatus,
-                  style: TextStyle(
-                    color: _getStatusColor(),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Connected',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: VarexColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        device!.name,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: VarexColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: VarexColors.secondary,
+                    shape: BoxShape.circle,
                   ),
                 ),
               ],
             ),
-          ).animate().slideX(delay: 200.ms, duration: 400.ms),
+          ),
 
-        const Spacer(),
+          const SizedBox(height: 20),
 
-        // Control Buttons
-        Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              Text(
-                'EXHAUST CONTROL',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white.withValues(alpha: 0.8),
-                  letterSpacing: 2,
+          // Status Card
+          if (lastCommandStatus.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _getStatusColor().withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _getStatusColor().withValues(alpha: 0.3),
                 ),
-              ).animate().slideY(delay: 300.ms, duration: 600.ms),
-
-              const SizedBox(height: 40),
-
-              Row(
+              ),
+              child: Row(
                 children: [
-                  Expanded(
-                    child: _buildControlButton(
-                      onPressed: () => sendCommand('1'),
-                      icon: PhosphorIcons.arrowsOut(),
-                      text: 'OPEN',
-                      gradient: VarexGradients.primaryGradient,
-                      delay: 400,
-                    ),
+                  Icon(
+                    _getStatusMaterialIcon(),
+                    color: _getStatusColor(),
+                    size: 20,
                   ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: _buildControlButton(
-                      onPressed: () => sendCommand('0'),
-                      icon: PhosphorIcons.arrowsIn(),
-                      text: 'CLOSE',
-                      gradient: VarexGradients.secondaryGradient,
-                      delay: 500,
+                  const SizedBox(width: 12),
+                  Text(
+                    lastCommandStatus,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: _getStatusColor(),
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 40),
-      ],
-    );
-  }
-
-  Widget _buildGlowButton({
-    required VoidCallback onPressed,
-    required PhosphorIconData icon,
-    required Gradient gradient,
-    String? text,
-    bool isLarge = false,
-  }) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        padding: EdgeInsets.all(isLarge ? 20 : 12),
-        decoration: BoxDecoration(
-          gradient: gradient,
-          borderRadius: BorderRadius.circular(isLarge ? 20 : 16),
-          boxShadow: [
-            BoxShadow(
-              color: gradient.colors.first.withValues(alpha: 0.4),
-              blurRadius: 20,
-              spreadRadius: 2,
             ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            PhosphorIcon(icon, color: Colors.white, size: isLarge ? 24 : 20),
-            if (text != null) ...[
-              const SizedBox(width: 12),
-              Text(
-                text,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: isLarge ? 16 : 14,
-                  letterSpacing: 1,
+
+          const Spacer(),
+
+          // Control Section
+          Text(
+            'Exhaust Control',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: VarexColors.textPrimary,
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Control Buttons
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: VarexColors.secondary,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => sendCommand('1'),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.open_in_full,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'OPEN',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Container(
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: VarexColors.destructive,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => sendCommand('0'),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.close_fullscreen,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'CLOSE',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
-          ],
-        ),
+          ),
+
+          const SizedBox(height: 40),
+        ],
       ),
     );
   }
 
-  Widget _buildControlButton({
-    required VoidCallback onPressed,
-    required PhosphorIconData icon,
-    required String text,
-    required Gradient gradient,
-    required int delay,
-  }) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        height: 80,
-        decoration: BoxDecoration(
-          gradient: gradient,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: gradient.colors.first.withValues(alpha: 0.4),
-              blurRadius: 25,
-              spreadRadius: 3,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            PhosphorIcon(icon, color: Colors.white, size: 32),
-            const SizedBox(height: 8),
-            Text(
-              text,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 16,
-                letterSpacing: 1,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ).animate().scale(delay: delay.ms, duration: 600.ms);
-  }
 
   Color _getStatusColor() {
-    if (lastCommandStatus.contains("ERROR")) return Colors.red;
-    if (lastCommandStatus.contains("COMPLETE")) return const Color(0xFF00D4FF);
-    return Colors.orange;
+    if (lastCommandStatus.contains("ERROR")) return VarexColors.destructive;
+    if (lastCommandStatus.contains("COMPLETE")) return VarexColors.secondary;
+    return VarexColors.primary;
   }
 
-  PhosphorIconData _getStatusIcon() {
-    if (lastCommandStatus.contains("ERROR")) return PhosphorIcons.xCircle();
-    if (lastCommandStatus.contains("COMPLETE")) {
-      return PhosphorIcons.checkCircle();
-    }
-    return PhosphorIcons.clock();
+  IconData _getStatusMaterialIcon() {
+    if (lastCommandStatus.contains("ERROR")) return Icons.error_outline;
+    if (lastCommandStatus.contains("COMPLETE")) return Icons.check_circle_outline;
+    return Icons.access_time;
   }
 }
