@@ -1,17 +1,14 @@
 #include <NimBLEDevice.h>
 
-#define OPEN_PIN 25        // Connect to CHJ-RXB3 Data 2A (Open)
-#define CLOSE_PIN 26       // Connect to CHJ-RXB3 Data 2B (Close)
-#define PULSE_DURATION 200 // ms
+#define OPEN_PIN 25
+#define CLOSE_PIN 26
+#define PULSE_DURATION 200
 
-// BLE service & characteristic UUIDs
 #define SERVICE_UUID "12345678-1234-1234-1234-1234567890ab"
 #define CHARACTERISTIC_UUID "abcd1234-5678-90ab-cdef-1234567890ab"
 
-NimBLEServer *pServer = nullptr;
 NimBLECharacteristic *pCharacteristic = nullptr;
 
-// Press a button (active LOW pulse)
 void pressButton(int pin)
 {
   digitalWrite(pin, LOW);
@@ -19,76 +16,49 @@ void pressButton(int pin)
   digitalWrite(pin, HIGH);
 }
 
-// BLE write callback
 class MyCallbacks : public NimBLECharacteristicCallbacks
 {
   void onWrite(NimBLECharacteristic *pChar) override
   {
-    std::string value = pChar->getValue();
-    if (value.length() > 0)
+    std::string val = pChar->getValue();
+    if (val.length() > 0)
     {
-      if (value[0] == '1')
-      { // Open
-        Serial.println("Opening exhaust");
+      if (val[0] == '1')
         pressButton(OPEN_PIN);
-      }
-      else if (value[0] == '0')
-      { // Close
-        Serial.println("Closing exhaust");
+      else if (val[0] == '0')
         pressButton(CLOSE_PIN);
-      }
-      Serial.flush();
     }
   }
 };
 
 void setup()
 {
-  // Give Serial time to initialize
   Serial.begin(115200);
   delay(2000);
-  Serial.println("HELLO ESP32");
-  Serial.flush();
 
   pinMode(OPEN_PIN, OUTPUT);
+  digitalWrite(OPEN_PIN, HIGH);
   pinMode(CLOSE_PIN, OUTPUT);
-  digitalWrite(OPEN_PIN, HIGH);  // Idle HIGH
-  digitalWrite(CLOSE_PIN, HIGH); // Idle HIGH
-
-  Serial.println("BLE Init...");
-  Serial.flush();
+  digitalWrite(CLOSE_PIN, HIGH);
 
   NimBLEDevice::init("Varex-ESP32");
 
-  pServer = NimBLEDevice::createServer();
-  Serial.println("BLE Server Created...");
-  Serial.flush();
-
+  NimBLEServer *pServer = NimBLEDevice::createServer();
   NimBLEService *pService = pServer->createService(SERVICE_UUID);
+
   pCharacteristic = pService->createCharacteristic(
       CHARACTERISTIC_UUID,
       NIMBLE_PROPERTY::WRITE);
 
-  Serial.println("BLE Service Created...");
-  Serial.flush();
-
   pCharacteristic->setCallbacks(new MyCallbacks());
-  Serial.println("BLE Callbacks set...");
-  Serial.flush();
-
   pService->start();
-  Serial.println("BLE Service Started...");
-  Serial.flush();
 
   NimBLEAdvertising *pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setName("Varex-ESP32");
   pAdvertising->start();
 
-  Serial.println("BLE Peripheral started. Waiting for Varex Controller app...");
-  Serial.flush();
+  Serial.println("BLE started and advertising only service UUID");
 }
 
-void loop()
-{
-  // Nothing needed here; BLE events handle everything
-}
+void loop() {}
