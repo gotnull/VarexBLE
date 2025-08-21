@@ -6,9 +6,11 @@
 
 #define SERVICE_UUID "12345678-1234-1234-1234-1234567890ab"
 #define CHARACTERISTIC_UUID "abcd1234-5678-90ab-cdef-1234567890ab"
+#define STATUS_CHARACTERISTIC_UUID "dcba4321-8765-ba09-fedc-4321876543ba"
 
 NimBLEServer *pServer = nullptr;
 NimBLECharacteristic *pCharacteristic = nullptr;
+NimBLECharacteristic *pStatusCharacteristic = nullptr;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 
@@ -47,6 +49,13 @@ char getNextCommand() {
   return cmd;
 }
 
+void sendStatusUpdate(const char* status) {
+  if (deviceConnected && pStatusCharacteristic != nullptr) {
+    pStatusCharacteristic->setValue(status);
+    pStatusCharacteristic->notify();
+  }
+}
+
 void startButtonPress(int pin, char cmd)
 {
   if (!buttonPressed) {  // Only if no button is currently being pressed
@@ -58,8 +67,10 @@ void startButtonPress(int pin, char cmd)
     // Print command info all at once to prevent corruption
     if (cmd == '1') {
       Serial.println("CMD:1 OPEN_START PIN:25");
+      sendStatusUpdate("OPEN_STARTED");
     } else if (cmd == '0') {
       Serial.println("CMD:0 CLOSE_START PIN:26");
+      sendStatusUpdate("CLOSE_STARTED");
     }
     Serial.flush();
   }
@@ -70,11 +81,13 @@ void updateButtonPress()
   if (buttonPressed && (millis() - buttonStartTime >= PULSE_DURATION)) {
     digitalWrite(activePin, HIGH);
     
-    // Print completion info
+    // Print completion info and send status update
     if (activePin == OPEN_PIN) {
       Serial.println("OPEN_COMPLETE PIN:25");
+      sendStatusUpdate("OPEN_COMPLETE");
     } else if (activePin == CLOSE_PIN) {
       Serial.println("CLOSE_COMPLETE PIN:26");
+      sendStatusUpdate("CLOSE_COMPLETE");
     }
     Serial.flush();
     
@@ -138,12 +151,19 @@ void setup()
   // Create BLE Service
   NimBLEService *pService = pServer->createService(SERVICE_UUID);
 
-  // Create BLE Characteristic
+  // Create BLE Write Characteristic (for commands)
   pCharacteristic = pService->createCharacteristic(
       CHARACTERISTIC_UUID,
       NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
 
   pCharacteristic->setCallbacks(new MyCharacteristicCallbacks());
+
+  // Create BLE Status Characteristic (for notifications)
+  pStatusCharacteristic = pService->createCharacteristic(
+      STATUS_CHARACTERISTIC_UUID,
+      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+
+  pStatusCharacteristic->setValue("READY");
   pService->start();
 
   // Start advertising

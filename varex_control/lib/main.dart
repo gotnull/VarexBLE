@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 final flutterReactiveBle = FlutterReactiveBle();
 final serviceUuid = Uuid.parse("12345678-1234-1234-1234-1234567890ab");
 final characteristicUuid = Uuid.parse("abcd1234-5678-90ab-cdef-1234567890ab");
+final statusCharacteristicUuid = Uuid.parse("dcba4321-8765-ba09-fedc-4321876543ba");
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,10 +44,13 @@ class BleControlPage extends StatefulWidget {
 class BleControlPageState extends State<BleControlPage> {
   DiscoveredDevice? device;
   QualifiedCharacteristic? exhaustChar;
+  QualifiedCharacteristic? statusChar;
   StreamSubscription<DiscoveredDevice>? scanSubscription;
   StreamSubscription<ConnectionStateUpdate>? connectionSubscription;
   StreamSubscription<BleStatus>? bleStatusSubscription;
+  StreamSubscription<List<int>>? statusSubscription;
   String statusMessage = "Initializing...";
+  String lastCommandStatus = "";
   bool isConnected = false;
   bool isScanning = false;
 
@@ -75,6 +79,7 @@ class BleControlPageState extends State<BleControlPage> {
     scanSubscription?.cancel();
     connectionSubscription?.cancel();
     bleStatusSubscription?.cancel();
+    statusSubscription?.cancel();
     super.dispose();
   }
 
@@ -208,19 +213,34 @@ class BleControlPageState extends State<BleControlPage> {
           serviceFound = true;
           for (final characteristic in service.characteristics) {
             debugPrint("  Characteristic: ${characteristic.id}");
+            
             if (characteristic.id == characteristicUuid) {
               exhaustChar = QualifiedCharacteristic(
                 serviceId: serviceUuid,
                 characteristicId: characteristicUuid,
                 deviceId: device.id,
               );
-
-              setState(() {
-                statusMessage = "Ready to control exhaust";
-                isConnected = true;
-              });
-              return;
             }
+            
+            if (characteristic.id == statusCharacteristicUuid) {
+              statusChar = QualifiedCharacteristic(
+                serviceId: serviceUuid,
+                characteristicId: statusCharacteristicUuid,
+                deviceId: device.id,
+              );
+              
+              // Subscribe to status notifications
+              subscribeToStatusUpdates();
+            }
+          }
+          
+          // Check if we found the required characteristics
+          if (exhaustChar != null) {
+            setState(() {
+              statusMessage = "Ready to control exhaust";
+              isConnected = true;
+            });
+            return;
           }
         }
       }
@@ -238,18 +258,58 @@ class BleControlPageState extends State<BleControlPage> {
     }
   }
 
+  void subscribeToStatusUpdates() {
+    if (statusChar != null) {
+      statusSubscription = flutterReactiveBle
+          .subscribeToCharacteristic(statusChar!)
+          .listen((data) {
+        final status = String.fromCharCodes(data);
+        debugPrint("Status update: $status");
+        
+        setState(() {
+          lastCommandStatus = status;
+        });
+        
+        // Show temporary status message
+        if (status.contains("COMPLETE")) {
+          setState(() {
+            statusMessage = status.replaceAll("_", " ").toLowerCase();
+          });
+          
+          // Reset status message after 2 seconds
+          Timer(const Duration(seconds: 2), () {
+            if (mounted) {
+              setState(() {
+                statusMessage = "Ready to control exhaust";
+              });
+            }
+          });
+        }
+      }, onError: (error) {
+        debugPrint("Status subscription error: $error");
+      });
+    }
+  }
+
   void sendCommand(String cmd) {
-    if (device == null || exhaustChar == null) {
+    if (device == null || exhaustChar == null || !isConnected) {
       debugPrint("Device or characteristic not ready");
       return;
     }
 
-    if (exhaustChar != null) {
-      flutterReactiveBle.writeCharacteristicWithResponse(
-        exhaustChar!,
-        value: [cmd.codeUnitAt(0)],
-      );
-    }
+    setState(() {
+      lastCommandStatus = cmd == '1' ? "OPENING..." : "CLOSING...";
+    });
+
+    flutterReactiveBle.writeCharacteristicWithResponse(
+      exhaustChar!,
+      value: [cmd.codeUnitAt(0)],
+    ).catchError((error) {
+      debugPrint("Write error: $error");
+      setState(() {
+        lastCommandStatus = "ERROR: $error";
+      });
+    });
   }
 
   @override
@@ -323,7 +383,38 @@ class BleControlPageState extends State<BleControlPage> {
                     statusMessage,
                     style: const TextStyle(color: Colors.green),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 10),
+                  if (lastCommandStatus.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: lastCommandStatus.contains("ERROR") 
+                            ? Colors.red.withOpacity(0.1)
+                            : lastCommandStatus.contains("COMPLETE")
+                            ? Colors.green.withOpacity(0.1)
+                            : Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: lastCommandStatus.contains("ERROR") 
+                              ? Colors.red
+                              : lastCommandStatus.contains("COMPLETE")
+                              ? Colors.green
+                              : Colors.orange,
+                        ),
+                      ),
+                      child: Text(
+                        lastCommandStatus,
+                        style: TextStyle(
+                          color: lastCommandStatus.contains("ERROR") 
+                              ? Colors.red
+                              : lastCommandStatus.contains("COMPLETE")
+                              ? Colors.green
+                              : Colors.orange,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 30),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
