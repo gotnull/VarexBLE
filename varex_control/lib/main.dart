@@ -13,7 +13,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 final flutterReactiveBle = FlutterReactiveBle();
 final serviceUuid = Uuid.parse("12345678-1234-1234-1234-1234567890ab");
 final characteristicUuid = Uuid.parse("abcd1234-5678-90ab-cdef-1234567890ab");
-final statusCharacteristicUuid = Uuid.parse("dcba4321-8765-ba09-fedc-4321876543ba");
+final statusCharacteristicUuid = Uuid.parse(
+  "dcba4321-8765-ba09-fedc-4321876543ba",
+);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,10 +38,12 @@ void main() async {
     }
   }
 
-  runApp(VarexApp());
+  runApp(const VarexApp());
 }
 
 class VarexApp extends StatelessWidget {
+  const VarexApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -52,7 +56,6 @@ class VarexApp extends StatelessWidget {
           primary: Color(0xFF00D4FF),
           secondary: Color(0xFFFF6B9D),
           surface: Color(0xFF0A0A0A),
-          background: Color(0xFF000000),
         ),
       ),
       home: const BleControlPage(),
@@ -65,39 +68,23 @@ class VarexGradients {
   static const primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [
-      Color(0xFF00D4FF),
-      Color(0xFF0099CC),
-      Color(0xFF0066FF),
-    ],
+    colors: [Color(0xFF00D4FF), Color(0xFF0099CC), Color(0xFF0066FF)],
   );
-  
+
   static const secondaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [
-      Color(0xFFFF6B9D),
-      Color(0xFFFF4081),
-      Color(0xFFE91E63),
-    ],
+    colors: [Color(0xFFFF6B9D), Color(0xFFFF4081), Color(0xFFE91E63)],
   );
-  
+
   static const backgroundGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [
-      Color(0xFF0A0A0A),
-      Color(0xFF000000),
-      Color(0xFF0A0A0A),
-    ],
+    colors: [Color(0xFF0A0A0A), Color(0xFF000000), Color(0xFF0A0A0A)],
   );
-  
+
   static const glowGradient = RadialGradient(
-    colors: [
-      Color(0x4400D4FF),
-      Color(0x2200D4FF),
-      Color(0x0000D4FF),
-    ],
+    colors: [Color(0x4400D4FF), Color(0x2200D4FF), Color(0x0000D4FF)],
   );
 }
 
@@ -239,7 +226,8 @@ class BleControlPageState extends State<BleControlPage> {
                 debugPrint("Connected! Discovering services...");
                 setState(() {
                   statusMessage = "Connected! Discovering services...";
-                  isConnecting = true; // Still connecting until services are discovered
+                  isConnecting =
+                      true; // Still connecting until services are discovered
                 });
                 discoverServices(device);
                 break;
@@ -287,7 +275,7 @@ class BleControlPageState extends State<BleControlPage> {
           serviceFound = true;
           for (final characteristic in service.characteristics) {
             debugPrint("  Characteristic: ${characteristic.id}");
-            
+
             if (characteristic.id == characteristicUuid) {
               exhaustChar = QualifiedCharacteristic(
                 serviceId: serviceUuid,
@@ -295,19 +283,19 @@ class BleControlPageState extends State<BleControlPage> {
                 deviceId: device.id,
               );
             }
-            
+
             if (characteristic.id == statusCharacteristicUuid) {
               statusChar = QualifiedCharacteristic(
                 serviceId: serviceUuid,
                 characteristicId: statusCharacteristicUuid,
                 deviceId: device.id,
               );
-              
+
               // Subscribe to status notifications
               subscribeToStatusUpdates();
             }
           }
-          
+
           // Check if we found the required characteristics
           if (exhaustChar != null) {
             setState(() {
@@ -339,32 +327,35 @@ class BleControlPageState extends State<BleControlPage> {
     if (statusChar != null) {
       statusSubscription = flutterReactiveBle
           .subscribeToCharacteristic(statusChar!)
-          .listen((data) {
-        final status = String.fromCharCodes(data);
-        debugPrint("Status update: $status");
-        
-        setState(() {
-          lastCommandStatus = status;
-        });
-        
-        // Show temporary status message
-        if (status.contains("COMPLETE")) {
-          setState(() {
-            statusMessage = status.replaceAll("_", " ").toLowerCase();
-          });
-          
-          // Reset status message after 2 seconds
-          Timer(const Duration(seconds: 2), () {
-            if (mounted) {
+          .listen(
+            (data) {
+              final status = String.fromCharCodes(data);
+              debugPrint("Status update: $status");
+
               setState(() {
-                statusMessage = "Ready to control exhaust";
+                lastCommandStatus = status;
               });
-            }
-          });
-        }
-      }, onError: (error) {
-        debugPrint("Status subscription error: $error");
-      });
+
+              // Show temporary status message
+              if (status.contains("COMPLETE")) {
+                setState(() {
+                  statusMessage = status.replaceAll("_", " ").toLowerCase();
+                });
+
+                // Reset status message after 2 seconds
+                Timer(const Duration(seconds: 2), () {
+                  if (mounted) {
+                    setState(() {
+                      statusMessage = "Ready to control exhaust";
+                    });
+                  }
+                });
+              }
+            },
+            onError: (error) {
+              debugPrint("Status subscription error: $error");
+            },
+          );
     }
   }
 
@@ -375,10 +366,10 @@ class BleControlPageState extends State<BleControlPage> {
     }
 
     // Haptic feedback
-    if (await Vibration.hasVibrator() ?? false) {
+    if (await Vibration.hasVibrator() == true) {
       Vibration.vibrate(duration: 50);
     }
-    
+
     // Light haptic feedback
     HapticFeedback.lightImpact();
 
@@ -386,15 +377,17 @@ class BleControlPageState extends State<BleControlPage> {
       lastCommandStatus = cmd == '1' ? "OPENING..." : "CLOSING...";
     });
 
-    flutterReactiveBle.writeCharacteristicWithResponse(
-      exhaustChar!,
-      value: [cmd.codeUnitAt(0)],
-    ).catchError((error) {
-      debugPrint("Write error: $error");
-      setState(() {
-        lastCommandStatus = "ERROR: $error";
-      });
-    });
+    flutterReactiveBle
+        .writeCharacteristicWithResponse(
+          exhaustChar!,
+          value: [cmd.codeUnitAt(0)],
+        )
+        .catchError((error) {
+          debugPrint("Write error: $error");
+          setState(() {
+            lastCommandStatus = "ERROR: $error";
+          });
+        });
   }
 
   @override
@@ -410,10 +403,12 @@ class BleControlPageState extends State<BleControlPage> {
             children: [
               // Custom App Bar
               _buildCustomAppBar(),
-              
+
               // Main Content
               Expanded(
-                child: !isConnected ? _buildConnectionScreen() : _buildControlScreen(),
+                child: !isConnected
+                    ? _buildConnectionScreen()
+                    : _buildControlScreen(),
               ),
             ],
           ),
@@ -434,7 +429,7 @@ class BleControlPageState extends State<BleControlPage> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF00D4FF).withOpacity(0.3),
+                  color: const Color(0x4D00D4FF),
                   blurRadius: 20,
                   spreadRadius: 2,
                 ),
@@ -457,15 +452,16 @@ class BleControlPageState extends State<BleControlPage> {
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
                     foreground: Paint()
-                      ..shader = VarexGradients.primaryGradient
-                          .createShader(const Rect.fromLTWH(0, 0, 200, 50)),
+                      ..shader = VarexGradients.primaryGradient.createShader(
+                        const Rect.fromLTWH(0, 0, 200, 50),
+                      ),
                   ),
                 ).animate().slideX(delay: 200.ms, duration: 600.ms),
                 Text(
                   'Exhaust Control System',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.7),
+                    color: const Color(0xB3FFFFFF),
                     fontWeight: FontWeight.w500,
                   ),
                 ).animate().slideX(delay: 300.ms, duration: 600.ms),
@@ -490,51 +486,59 @@ class BleControlPageState extends State<BleControlPage> {
         children: [
           // Animated Bluetooth Icon
           Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: isScanning || isConnecting 
-                  ? VarexGradients.primaryGradient
-                  : null,
-              color: isScanning || isConnecting ? null : Colors.grey.withOpacity(0.2),
-              boxShadow: isScanning || isConnecting ? [
-                BoxShadow(
-                  color: const Color(0xFF00D4FF).withOpacity(0.4),
-                  blurRadius: 40,
-                  spreadRadius: 10,
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: isScanning || isConnecting
+                      ? VarexGradients.primaryGradient
+                      : null,
+                  color: isScanning || isConnecting
+                      ? null
+                      : Colors.grey.withValues(alpha: 0.2),
+                  boxShadow: isScanning || isConnecting
+                      ? [
+                          BoxShadow(
+                            color: const Color(
+                              0xFF00D4FF,
+                            ).withValues(alpha: 0.4),
+                            blurRadius: 40,
+                            spreadRadius: 10,
+                          ),
+                        ]
+                      : null,
                 ),
-              ] : null,
-            ),
-            child: PhosphorIcon(
-              isScanning || isConnecting
-                  ? PhosphorIcons.bluetoothConnected()
-                  : PhosphorIcons.bluetooth(),
-              color: Colors.white,
-              size: 48,
-            ),
-          )
-          .animate(onPlay: (controller) => controller.repeat())
-          .shimmer(
-            duration: 2000.ms,
-            color: isScanning || isConnecting ? const Color(0xFF00D4FF) : Colors.transparent,
-          )
-          .scale(
-            begin: const Offset(1.0, 1.0),
-            end: const Offset(1.1, 1.1),
-            duration: 1000.ms,
-          ),
-          
+                child: PhosphorIcon(
+                  isScanning || isConnecting
+                      ? PhosphorIcons.bluetoothConnected()
+                      : PhosphorIcons.bluetooth(),
+                  color: Colors.white,
+                  size: 48,
+                ),
+              )
+              .animate(onPlay: (controller) => controller.repeat())
+              .shimmer(
+                duration: 2000.ms,
+                color: isScanning || isConnecting
+                    ? const Color(0xFF00D4FF)
+                    : Colors.transparent,
+              )
+              .scale(
+                begin: const Offset(1.0, 1.0),
+                end: const Offset(1.1, 1.1),
+                duration: 1000.ms,
+              ),
+
           const SizedBox(height: 40),
-          
+
           // Status Message
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -548,18 +552,18 @@ class BleControlPageState extends State<BleControlPage> {
               ),
             ),
           ).animate().slideY(delay: 200.ms, duration: 600.ms),
-          
+
           const SizedBox(height: 40),
-          
+
           // Permission Instructions
           if (statusMessage.contains("permissions"))
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 32),
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
               ),
               child: Column(
                 children: [
@@ -581,19 +585,18 @@ class BleControlPageState extends State<BleControlPage> {
                   const Text(
                     "Go to Settings > Privacy > Location Services\nand enable for this app",
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white70,
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.white70),
                   ),
                 ],
               ),
             ).animate().slideY(delay: 400.ms, duration: 600.ms),
-          
+
           const SizedBox(height: 40),
-          
+
           // Scan Button or Progress
-          if (!isScanning && !isConnecting && !statusMessage.contains("permissions"))
+          if (!isScanning &&
+              !isConnecting &&
+              !statusMessage.contains("permissions"))
             _buildGlowButton(
               onPressed: scanAndConnect,
               icon: PhosphorIcons.magnifyingGlass(),
@@ -601,7 +604,7 @@ class BleControlPageState extends State<BleControlPage> {
               text: "SCAN FOR DEVICE",
               isLarge: true,
             ).animate().slideY(delay: 600.ms, duration: 600.ms),
-          
+
           if (isScanning || isConnecting)
             Column(
               children: [
@@ -618,7 +621,7 @@ class BleControlPageState extends State<BleControlPage> {
                 const SizedBox(height: 20),
                 if (isScanning)
                   Shimmer.fromColors(
-                    baseColor: Colors.white.withOpacity(0.5),
+                    baseColor: Colors.white.withValues(alpha: 0.5),
                     highlightColor: const Color(0xFF00D4FF),
                     child: const Text(
                       'SCANNING...',
@@ -631,7 +634,7 @@ class BleControlPageState extends State<BleControlPage> {
                   ),
                 if (isConnecting)
                   Shimmer.fromColors(
-                    baseColor: Colors.white.withOpacity(0.5),
+                    baseColor: Colors.white.withValues(alpha: 0.5),
                     highlightColor: const Color(0xFF00D4FF),
                     child: const Text(
                       'CONNECTING...',
@@ -660,12 +663,12 @@ class BleControlPageState extends State<BleControlPage> {
             gradient: VarexGradients.glowGradient,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: const Color(0xFF00D4FF).withOpacity(0.3),
+              color: const Color(0xFF00D4FF).withValues(alpha: 0.3),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF00D4FF).withOpacity(0.2),
+                color: const Color(0xFF00D4FF).withValues(alpha: 0.2),
                 blurRadius: 30,
                 spreadRadius: 5,
               ),
@@ -675,44 +678,48 @@ class BleControlPageState extends State<BleControlPage> {
             children: [
               // Connected Icon
               Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: VarexGradients.primaryGradient,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF00D4FF).withOpacity(0.5),
-                      blurRadius: 20,
-                      spreadRadius: 2,
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: VarexGradients.primaryGradient,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00D4FF).withValues(alpha: 0.5),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: PhosphorIcon(
-                  PhosphorIcons.checkCircle(),
-                  color: Colors.white,
-                  size: 32,
-                ),
-              )
-              .animate(onPlay: (controller) => controller.repeat())
-              .shimmer(duration: 3000.ms, color: Colors.white.withOpacity(0.3)),
-              
+                    child: PhosphorIcon(
+                      PhosphorIcons.checkCircle(),
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  )
+                  .animate(onPlay: (controller) => controller.repeat())
+                  .shimmer(
+                    duration: 3000.ms,
+                    color: Colors.white.withValues(alpha: 0.3),
+                  ),
+
               const SizedBox(height: 16),
-              
+
               Text(
                 "CONNECTED",
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   foreground: Paint()
-                    ..shader = VarexGradients.primaryGradient
-                        .createShader(const Rect.fromLTWH(0, 0, 200, 50)),
+                    ..shader = VarexGradients.primaryGradient.createShader(
+                      const Rect.fromLTWH(0, 0, 200, 50),
+                    ),
                   letterSpacing: 2,
                 ),
               ),
-              
+
               const SizedBox(height: 8),
-              
+
               Text(
                 device!.name,
                 style: TextStyle(
@@ -721,35 +728,35 @@ class BleControlPageState extends State<BleControlPage> {
                   color: Colors.white,
                 ),
               ),
-              
+
               const SizedBox(height: 8),
-              
+
               Text(
                 statusMessage,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                 ),
               ),
             ],
           ),
         ).animate().slideY(delay: 100.ms, duration: 600.ms),
-        
+
         // Command Status
         if (lastCommandStatus.isNotEmpty)
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
-              color: _getStatusColor().withOpacity(0.2),
+              color: _getStatusColor().withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: _getStatusColor().withOpacity(0.5),
+                color: _getStatusColor().withValues(alpha: 0.5),
                 width: 2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: _getStatusColor().withOpacity(0.3),
+                  color: _getStatusColor().withValues(alpha: 0.3),
                   blurRadius: 20,
                   spreadRadius: 2,
                 ),
@@ -775,9 +782,9 @@ class BleControlPageState extends State<BleControlPage> {
               ],
             ),
           ).animate().slideX(delay: 200.ms, duration: 400.ms),
-        
+
         const Spacer(),
-        
+
         // Control Buttons
         Container(
           padding: const EdgeInsets.all(20),
@@ -788,13 +795,13 @@ class BleControlPageState extends State<BleControlPage> {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   letterSpacing: 2,
                 ),
               ).animate().slideY(delay: 300.ms, duration: 600.ms),
-              
+
               const SizedBox(height: 40),
-              
+
               Row(
                 children: [
                   Expanded(
@@ -821,7 +828,7 @@ class BleControlPageState extends State<BleControlPage> {
             ],
           ),
         ),
-        
+
         const SizedBox(height: 40),
       ],
     );
@@ -833,7 +840,6 @@ class BleControlPageState extends State<BleControlPage> {
     required Gradient gradient,
     String? text,
     bool isLarge = false,
-    int delay = 0,
   }) {
     return GestureDetector(
       onTap: onPressed,
@@ -844,7 +850,7 @@ class BleControlPageState extends State<BleControlPage> {
           borderRadius: BorderRadius.circular(isLarge ? 20 : 16),
           boxShadow: [
             BoxShadow(
-              color: gradient.colors.first.withOpacity(0.4),
+              color: gradient.colors.first.withValues(alpha: 0.4),
               blurRadius: 20,
               spreadRadius: 2,
             ),
@@ -888,7 +894,7 @@ class BleControlPageState extends State<BleControlPage> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: gradient.colors.first.withOpacity(0.4),
+              color: gradient.colors.first.withValues(alpha: 0.4),
               blurRadius: 25,
               spreadRadius: 3,
             ),
@@ -922,7 +928,9 @@ class BleControlPageState extends State<BleControlPage> {
 
   PhosphorIconData _getStatusIcon() {
     if (lastCommandStatus.contains("ERROR")) return PhosphorIcons.xCircle();
-    if (lastCommandStatus.contains("COMPLETE")) return PhosphorIcons.checkCircle();
+    if (lastCommandStatus.contains("COMPLETE")) {
+      return PhosphorIcons.checkCircle();
+    }
     return PhosphorIcons.clock();
   }
 }
