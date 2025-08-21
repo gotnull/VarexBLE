@@ -53,6 +53,7 @@ class BleControlPageState extends State<BleControlPage> {
   String lastCommandStatus = "";
   bool isConnected = false;
   bool isScanning = false;
+  bool isConnecting = false;
 
   @override
   void initState() {
@@ -126,6 +127,7 @@ class BleControlPageState extends State<BleControlPage> {
               setState(() {
                 statusMessage = "Found VarexESP32! Connecting...";
                 isScanning = false;
+                isConnecting = true;
               });
 
               connectToDevice(device);
@@ -163,12 +165,14 @@ class BleControlPageState extends State<BleControlPage> {
               case DeviceConnectionState.connecting:
                 setState(() {
                   statusMessage = "Connecting to ${device.name}...";
+                  isConnecting = true;
                 });
                 break;
               case DeviceConnectionState.connected:
                 debugPrint("Connected! Discovering services...");
                 setState(() {
                   statusMessage = "Connected! Discovering services...";
+                  isConnecting = true; // Still connecting until services are discovered
                 });
                 discoverServices(device);
                 break;
@@ -176,12 +180,14 @@ class BleControlPageState extends State<BleControlPage> {
                 setState(() {
                   statusMessage = "Disconnecting...";
                   isConnected = false;
+                  isConnecting = false;
                 });
                 break;
               case DeviceConnectionState.disconnected:
                 setState(() {
                   statusMessage = "Disconnected. Tap to reconnect.";
                   isConnected = false;
+                  isConnecting = false;
                   this.device = null;
                   exhaustChar = null;
                 });
@@ -193,6 +199,7 @@ class BleControlPageState extends State<BleControlPage> {
             setState(() {
               statusMessage = "Connection failed: $error";
               isConnected = false;
+              isConnecting = false;
             });
           },
         );
@@ -239,6 +246,7 @@ class BleControlPageState extends State<BleControlPage> {
             setState(() {
               statusMessage = "Ready to control exhaust";
               isConnected = true;
+              isConnecting = false; // Connection process complete
             });
             return;
           }
@@ -248,12 +256,14 @@ class BleControlPageState extends State<BleControlPage> {
       if (!serviceFound) {
         setState(() {
           statusMessage = "Service not found on device";
+          isConnecting = false;
         });
       }
     } catch (e) {
       debugPrint("Service discovery error: $e");
       setState(() {
         statusMessage = "Service discovery failed: $e";
+        isConnecting = false;
       });
     }
   }
@@ -318,7 +328,7 @@ class BleControlPageState extends State<BleControlPage> {
       appBar: AppBar(
         title: const Text("Varex BLE Control"),
         actions: [
-          if (!isConnected && !isScanning)
+          if (!isConnected && !isScanning && !isConnecting)
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: scanAndConnect,
@@ -331,11 +341,11 @@ class BleControlPageState extends State<BleControlPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    isScanning
+                    isScanning || isConnecting
                         ? Icons.bluetooth_searching
                         : Icons.bluetooth_disabled,
                     size: 64,
-                    color: isScanning ? Colors.blue : Colors.grey,
+                    color: isScanning || isConnecting ? Colors.blue : Colors.grey,
                   ),
                   const SizedBox(height: 20),
                   Text(
@@ -350,12 +360,12 @@ class BleControlPageState extends State<BleControlPage> {
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, color: Colors.grey),
                     ),
-                  if (!isScanning && !statusMessage.contains("permissions"))
+                  if (!isScanning && !isConnecting && !statusMessage.contains("permissions"))
                     ElevatedButton(
                       onPressed: scanAndConnect,
                       child: const Text("Scan for Device"),
                     ),
-                  if (isScanning)
+                  if (isScanning || isConnecting)
                     const Padding(
                       padding: EdgeInsets.all(16.0),
                       child: CircularProgressIndicator(),
