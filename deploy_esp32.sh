@@ -6,8 +6,9 @@
 set -e  # Exit on any error
 
 # Configuration
-FQBN="esp32:esp32:lilygo_t_display_s3"
+# FQBN="esp32:esp32:lilygo_t_display_s3"
 # FQBN="esp32:esp32:esp32"
+FQBN="esp32:esp32:esp32c3"
 
 PORT="/dev/cu.usbmodem1201" # T-Display-S3
 # PORT="/dev/cu.usbserial-0206671E" # TTGO-T1

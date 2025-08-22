@@ -1,7 +1,7 @@
 #include <NimBLEDevice.h>
 
-#define OPEN_PIN 25
-#define CLOSE_PIN 26
+#define OPEN_PIN 2
+#define CLOSE_PIN 4
 #define PULSE_DURATION 200
 
 #define SERVICE_UUID "12345678-1234-1234-1234-1234567890ab"
@@ -75,13 +75,13 @@ void startButtonPress(int pin, char cmd)
     if (cmd == '1')
     {
       digitalWrite(OPEN_PIN, LOW);
-      Serial.println("CMD:1 OPEN_START PIN:11");
+      Serial.println("CMD:1 OPEN_START PIN:1");
       sendStatusUpdate("OPEN_STARTED");
     }
     else if (cmd == '0')
     {
       digitalWrite(CLOSE_PIN, LOW);
-      Serial.println("CMD:0 CLOSE_START PIN:10");
+      Serial.println("CMD:0 CLOSE_START PIN:2");
       sendStatusUpdate("CLOSE_STARTED");
     }
     Serial.flush();
@@ -97,12 +97,12 @@ void updateButtonPress()
     // Print completion info and send status update
     if (activePin == OPEN_PIN)
     {
-      Serial.println("OPEN_COMPLETE PIN:11");
+      Serial.println("OPEN_COMPLETE PIN:1");
       sendStatusUpdate("OPEN_COMPLETE");
     }
     else if (activePin == CLOSE_PIN)
     {
-      Serial.println("CLOSE_COMPLETE PIN:10");
+      Serial.println("CLOSE_COMPLETE PIN:2");
       sendStatusUpdate("CLOSE_COMPLETE");
     }
     Serial.flush();
