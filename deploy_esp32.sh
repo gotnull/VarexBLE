@@ -7,7 +7,11 @@ set -e  # Exit on any error
 
 # Configuration
 FQBN="esp32:esp32:lilygo_t_display_s3"
-PORT="/dev/cu.usbmodem1201"
+# FQBN="esp32:esp32:esp32"
+
+PORT="/dev/cu.usbmodem1201" # T-Display-S3
+# PORT="/dev/cu.usbserial-0206671E" # TTGO-T1
+
 BAUDRATE="115200"
 SKETCH_NAME="VarexBLE.ino"
 
